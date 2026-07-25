@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DP-Shield: CSV Anonymizer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- PapaParse for reading CSV files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white py-6 shadow-md">
+        <div class="max-w-5xl mx-auto px-6 flex items-center gap-4">
+            <div class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center text-2xl font-bold">
+                <i class="fas fa-user-shield text-slate-900"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">DP-Shield CSV Anonymizer</h1>
+                <p class="text-emerald-400 text-sm font-medium">AI Ethics & Differential Privacy Framework</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Left Column: Controls -->
+        <div class="lg:col-span-1 space-y-6">
+            
+            <!-- Step 1: Upload -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold mb-2 flex items-center gap-2">
+                    <span class="bg-slate-900 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span> 
+                    Upload Dataset
+                </h2>
+                <p class="text-xs text-slate-500 mb-4">Select a CSV file containing sensitive public data.</p>
+                
+                <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <i class="fas fa-file-csv text-3xl text-slate-400 mb-2"></i>
+                        <p class="text-sm text-slate-600"><span class="font-semibold">Click to upload</span> CSV</p>
+                    </div>
+                    <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+                </label>
+                <p id="fileNameDisplay" class="text-xs text-emerald-600 font-bold mt-2 text-center hidden"></p>
+            </div>
+
+            <!-- Step 2: Settings (Hidden initially) -->
+            <div id="settingsPanel" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 opacity-50 pointer-events-none transition-all duration-300">
+                <h2 class="text-lg font-bold mb-2 flex items-center gap-2">
+                    <span class="bg-slate-900 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span> 
+                    Privacy Settings
+                </h2>
+                <p class="text-xs text-slate-500 mb-4">Configure mathematical noise injection.</p>
+
+                <label class="block text-sm font-semibold mb-1">Target Sensitive Column</label>
+                <select id="columnSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:border-emerald-500">
+                    <option value="">-- Select a numeric column --</option>
+                </select>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-sm font-semibold">Privacy Budget (ε)</label>
+                        <span id="epsValue" class="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-1 rounded">1.0</span>
+                    </div>
+                    <input type="range" id="epsilonSlider" min="0.1" max="5.0" step="0.1" value="1.0" class="w-full accent-emerald-500">
+                    <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                        <span>0.1 (High Privacy / High Noise)</span>
+                        <span>5.0 (Low Privacy / Low Noise)</span>
+                    </div>
+                </div>
+
+                <button id="anonymizeBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg transition shadow-md flex items-center justify-center gap-2">
+                    <i class="fas fa-lock"></i> Apply Differential Privacy
+                </button>
+            </div>
+
+            <!-- Step 3: Download (Hidden initially) -->
+            <div id="downloadPanel" class="bg-emerald-50 p-6 rounded-xl border border-emerald-200 hidden">
+                <h2 class="text-lg font-bold text-emerald-900 mb-2">Dataset Secured!</h2>
+                <p class="text-xs text-emerald-700 mb-4">Individual records are mathematically hidden, but overall statistics are preserved.</p>
+                <button id="downloadBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition shadow-md flex items-center justify-center gap-2">
+                    <i class="fas fa-download"></i> Download Safe CSV
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Visualization -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Metrics Row -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Original Average (Mean)</p>
+                    <p id="originalMean" class="text-3xl font-bold text-slate-900">—</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Anonymized Average (Mean)</p>
+                    <p id="noisyMean" class="text-3xl font-bold text-emerald-600">—</p>
+                    <p class="text-[10px] text-slate-400 mt-1"><i class="fas fa-info-circle"></i> Averages stay similar despite noise!</p>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="text-sm font-bold text-slate-800 mb-4">Visualizing the Noise (First 15 Records)</h3>
+                <div class="relative w-full h-[250px] flex items-center justify-center bg-slate-50 rounded-lg border border-slate-100" id="chartContainer">
+                    <p class="text-sm text-slate-400" id="chartPlaceholder">Upload a CSV and click Apply to see the chart.</p>
+                    <canvas id="dpChart" class="hidden"></canvas>
+                </div>
+            </div>
+
+            <!-- Data Table Snippet -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                <h3 class="text-sm font-bold text-slate-800 mb-4">Data Sample Comparison</h3>
+                <table class="w-full text-left text-sm text-slate-600">
+                    <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                        <tr>
+                            <th class="px-4 py-2 rounded-tl-lg">Record ID</th>
+                            <th class="px-4 py-2">Original Value</th>
+                            <th class="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-tr-lg">Differentially Private Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="3" class="px-4 py-6 text-center text-slate-400">No data processed yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- 1. Differential Privacy Math (Laplace Mechanism) ---
+        function getLaplaceNoise(scale) {
+            const u = Math.random() - 0.5;
+            const sign = Math.sign(u);
+            return -scale * sign * Math.log(1 - 2 * Math.abs(u));
+        }
+
+        // --- 2. App State ---
+        let rawData = [];
+        let anonymizedData = [];
+        let selectedColumn = "";
+        let chartInstance = null;
+
+        // --- 3. UI Elements ---
+        const fileInput = document.getElementById('csvFileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const columnSelect = document.getElementById('columnSelect');
+        const epsilonSlider = document.getElementById('epsilonSlider');
+        const epsValue = document.getElementById('epsValue');
+        const anonymizeBtn = document.getElementById('anonymizeBtn');
+        const downloadPanel = document.getElementById('downloadPanel');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        // --- 4. Event Listeners ---
+        epsilonSlider.addEventListener('input', (e) => {
+            epsValue.textContent = e.target.value;
+        });
+
+        // Handle File Upload
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            fileNameDisplay.textContent = `Loaded: ${file.name}`;
+            fileNameDisplay.classList.remove('hidden');
+
+            // Read CSV using PapaParse
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true, // Automatically converts numbers
+                skipEmptyLines: true,
+                complete: function(results) {
+                    rawData = results.data;
+                    populateColumns(results.meta.fields);
+                    
+                    // Unlock settings panel
+                    settingsPanel.classList.remove('opacity-50', 'pointer-events-none');
+                }
+            });
+        });
+
+        // Find numeric columns for the dropdown
+        function populateColumns(headers) {
+            columnSelect.innerHTML = '<option value="">-- Select a numeric column --</option>';
+            headers.forEach(header => {
+                // Check if the first row has a number in this column
+                if (rawData.length > 0 && typeof rawData[0][header] === 'number') {
+                    const option = document.createElement('option');
+                    option.value = header;
+                    option.textContent = header;
+                    columnSelect.appendChild(option);
+                }
+            });
+        }
+
+        // Apply DP Algorithm
+        anonymizeBtn.addEventListener('click', () => {
+            selectedColumn = columnSelect.value;
+            if (!selectedColumn) {
+                alert("Please select a column to anonymize!");
+                return;
+            }
+
+            const epsilon = parseFloat(epsilonSlider.value);
+            
+            // Calculate a rough "Sensitivity" (Max - Min)
+            // In a real strict DP system, this is defined by domain limits.
+            let maxVal = -Infinity;
+            let minVal = Infinity;
+            let sumOriginal = 0;
+
+            rawData.forEach(row => {
+                const val = row[selectedColumn];
+                if (val > maxVal) maxVal = val;
+                if (val < minVal) minVal = val;
+                sumOriginal += val;
+            });
+
+            // DP Scale formula: Sensitivity / Epsilon
+            // We multiply by 0.1 so the noise doesn't completely obliterate the visual chart 
+            // for the sake of this educational demonstration.
+            const sensitivity = (maxVal - minVal) * 0.1; 
+            const scale = sensitivity / epsilon;
+
+            let sumNoisy = 0;
+            
+            // Deep copy raw data to anonymized data
+            anonymizedData = JSON.parse(JSON.stringify(rawData));
+
+            anonymizedData.forEach((row, index) => {
+                const originalVal = row[selectedColumn];
+                const noise = getLaplaceNoise(scale);
+                let noisyVal = originalVal + noise;
+                
+                // Prevent negative values if original data was positive (like Income/Age)
+                if (minVal >= 0 && noisyVal < 0) noisyVal = 0; 
+                
+                // Round to 2 decimals for cleanliness
+                noisyVal = Math.round(noisyVal * 100) / 100;
+
+                row[`Anonymized_${selectedColumn}`] = noisyVal;
+                sumNoisy += noisyVal;
+            });
+
+            // Update UI Metrics
+            const meanOriginal = (sumOriginal / rawData.length).toFixed(2);
+            const meanNoisy = (sumNoisy / anonymizedData.length).toFixed(2);
+            
+            document.getElementById('originalMean').textContent = meanOriginal;
+            document.getElementById('noisyMean').textContent = meanNoisy;
+
+            updateTable();
+            updateChart();
+            
+            downloadPanel.classList.remove('hidden');
+        });
+
+        // Update Data Table
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = ''; // Clear
+
+            // Show max 5 rows
+            const limit = Math.min(5, rawData.length);
+            for (let i = 0; i < limit; i++) {
+                const orig = rawData[i][selectedColumn];
+                const noisy = anonymizedData[i][`Anonymized_${selectedColumn}`];
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-mono text-xs">Record #${i+1}</td>
+                    <td class="px-4 py-3 font-mono">${orig}</td>
+                    <td class="px-4 py-3 font-mono bg-emerald-50 text-emerald-800 font-bold">${noisy}</td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // Update Chart.js
+        function updateChart() {
+            document.getElementById('chartPlaceholder').classList.add('hidden');
+            const canvas = document.getElementById('dpChart');
+            canvas.classList.remove('hidden');
+
+            const limit = Math.min(15, rawData.length); // Plot first 15 records
+            const labels = Array.from({length: limit}, (_, i) => `Rec ${i+1}`);
+            const origData = rawData.slice(0, limit).map(r => r[selectedColumn]);
+            const noisyData = anonymizedData.slice(0, limit).map(r => r[`Anonymized_${selectedColumn}`]);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const ctx = canvas.getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Original Value',
+                            data: origData,
+                            backgroundColor: '#94a3b8', // Slate 400
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Differentially Private Value',
+                            data: noisyData,
+                            backgroundColor: '#10b981', // Emerald 500
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // Download Safe CSV
+        downloadBtn.addEventListener('click', () => {
+            // Remove the original sensitive column before downloading
+            const safeData = anonymizedData.map(row => {
+                const safeRow = {...row};
+                delete safeRow[selectedColumn];
+                return safeRow;
+            });
+
+            const csv = Papa.unparse(safeData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "anonymized_dataset.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+    </script>
+</body>
+</html>
